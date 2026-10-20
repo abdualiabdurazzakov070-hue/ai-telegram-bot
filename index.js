@@ -1,0 +1,176 @@
+import http from 'http';
+import { TELEGRAM_BOT_TOKEN, GROQ_API_KEY } from './config.js';
+
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN;
+const GROQ_KEY = process.env.GROQ_API_KEY || GROQ_API_KEY;
+
+let offset = 0;
+
+console.log("------------------------------------------");
+console.log("🚀 AI Yordamchi Telegram bot ishga tushdi!");
+console.log("🤖 Bot: @Abdu_yordamchi_bot");
+console.log("⚡ Groq GPT-OSS-120B Flagman AI ulandi!");
+console.log("------------------------------------------");
+
+// Ob-havo ma'lumotlarini olish
+async function getWeather(city = 'Tashkent') {
+  try {
+    const res = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`);
+    const data = await res.json();
+    const current = data.current_condition[0];
+    return `${city} ob-havosi: Harorat ${current.temp_C}°C, Havo holati: ${current.weatherDesc[0].value}, Namlik: ${current.humidity}%.`;
+  } catch (e) {
+    return null;
+  }
+}
+
+// "Yozmoqda..." holati
+async function sendChatAction(chatId) {
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendChatAction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, action: 'typing' })
+    });
+  } catch (e) {}
+}
+
+// Telegramga xabar jo'natish
+async function sendMessage(chatId, text) {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: text })
+    });
+    const d = await res.json();
+    if (!d.ok) {
+      console.error("Xabar jo'natishda xatolik:", d);
+    }
+  } catch (e) {
+    console.error("Tarmoq xatosi (sendMessage):", e.message);
+  }
+}
+
+// Groq orqali AI javobini olish (Flagman GPT-OSS-120B modeli)
+async function askAI(promptText) {
+  // 1-urinish: openai/gpt-oss-120b (Eng kuchli model)
+  try {
+    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_KEY.trim()}`
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-oss-120b",
+        messages: [
+          {
+            role: "system",
+            content: "Siz aqlli, samimiy va do'stona Telegram AI yordamchisiz. Foydalanuvchilar bilan har doim ravon, chiroyli va tushunarli o'zbek tilida muloqot qiling."
+          },
+          { role: "user", content: promptText }
+        ]
+      })
+    });
+    const groqData = await groqRes.json();
+    const content = groqData.choices?.[0]?.message?.content;
+    if (content) return content.trim();
+  } catch (err) {
+    console.warn("120b modelida xatolik, zaxira qwen modeliga o'tilmoqda...");
+  }
+
+  // 2-urinish: qwen/qwen3.8-27b (Zaxira model)
+  try {
+    const qwenRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_KEY.trim()}`
+      },
+      body: JSON.stringify({
+        model: "qwen/qwen3.8-27b",
+        messages: [
+          {
+            role: "system",
+            content: "Siz aqlli va do'stona Telegram AI yordamchisiz. O'zbek tilida ravon javob bering."
+          },
+          { role: "user", content: promptText }
+        ]
+      })
+    });
+    const qwenData = await qwenRes.json();
+    const content = qwenData.choices?.[0]?.message?.content;
+    if (content) return content.trim();
+  } catch (err) {
+    console.error("Zaxira Groq modeli xatosi:", err.message);
+  }
+
+  return "Kechirasiz, savolingizga javob olishda uzilish bo'ldi. Iltimos, qaytadan yozib ko'ring.";
+}
+
+// Xabarni qabul qilish va javob qaytarish
+async function handleMessage(msg) {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+
+  if (!text) return;
+
+  console.log(`📩 Xabar keldi [${chatId}]: "${text}"`);
+
+  if (text === '/start') {
+    const welcome = "Assalomu alaykum! Men sizning aqlli AI yordamchingizman. 🤖✨\n\nMenga xohlagan savolingizni berishingiz mumkin. O'zbek tilida ravon suhbatlashamiz!";
+    await sendMessage(chatId, welcome);
+    return;
+  }
+
+  // Yozmoqda... animatsiyasi
+  await sendChatAction(chatId);
+
+  let promptText = text;
+  if (text.toLowerCase().includes('pogoda') || text.toLowerCase().includes('ob-havo') || text.toLowerCase().includes('ob havo')) {
+    const weatherInfo = await getWeather('Tashkent');
+    if (weatherInfo) {
+      promptText = `[Tizim ma'lumoti: ${weatherInfo}]. Foydalanuvchi savoli: "${text}". O'zbek tilida chiroyli va samimiy javob bering.`;
+    }
+  }
+
+  const reply = await askAI(promptText);
+  await sendMessage(chatId, reply);
+  console.log(`📤 Javob muvaffaqiyatli yuborildi [${chatId}]`);
+}
+
+// Doimiy xabarlarni qabul qilish sikli (Polling)
+async function startPolling() {
+  console.log("📡 Telegramdan xabarlar kutilmoqda...");
+  while (true) {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset}&timeout=15`);
+      const data = await res.json();
+
+      if (data.ok && Array.isArray(data.result)) {
+        for (const update of data.result) {
+          offset = update.update_id + 1;
+          if (update.message) {
+            await handleMessage(update.message);
+          }
+        }
+      } else {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    } catch (err) {
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+}
+
+startPolling();
+
+// Render.com va bulutli hostinglar uchun web port
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end("Bot 24/7 faol ishlamoqda! 🚀");
+}).listen(PORT, () => {
+  console.log(`🌐 Web server ${PORT}-portda faol.`);
+});
