@@ -1,15 +1,15 @@
 import http from 'http';
-import { TELEGRAM_BOT_TOKEN, GROQ_API_KEY } from './config.js';
+import { TELEGRAM_BOT_TOKEN, GEMINI_API_KEY } from './config.js';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN;
-const GROQ_KEY = process.env.GROQ_API_KEY || GROQ_API_KEY;
+const GEMINI_KEY = process.env.GEMINI_API_KEY || GEMINI_API_KEY;
 
 let offset = 0;
 
 console.log("------------------------------------------");
 console.log("🚀 AI Yordamchi Telegram bot ishga tushdi!");
 console.log("🤖 Bot: @Abdu_yordamchi_bot");
-console.log("⚡ Groq GPT-OSS-120B Flagman AI ulandi!");
+console.log("⚡ Google Gemini 1.5 Flash AI ulandi!");
 console.log("------------------------------------------");
 
 // Ob-havo ma'lumotlarini olish
@@ -52,61 +52,29 @@ async function sendMessage(chatId, text) {
   }
 }
 
-// Groq orqali AI javobini olish (Flagman GPT-OSS-120B modeli)
+// Google Gemini orqali AI javobini olish (gemini-1.5-flash)
 async function askAI(promptText) {
-  // 1-urinish: openai/gpt-oss-120b (Eng kuchli model)
   try {
-    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY.trim()}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROQ_KEY.trim()}`
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: "openai/gpt-oss-120b",
-        messages: [
+        contents: [
           {
-            role: "system",
-            content: "Siz aqlli, samimiy va do'stona Telegram AI yordamchisiz. Foydalanuvchilar bilan har doim ravon, chiroyli va tushunarli o'zbek tilida muloqot qiling."
-          },
-          { role: "user", content: promptText }
+            parts: [
+              { text: `Siz aqlli, samimiy va do'stona Telegram AI yordamchisiz. O'zbek tilida ravon va aniq javob bering.\n\nSavol: ${promptText}` }
+            ]
+          }
         ]
       })
     });
-    const groqData = await groqRes.json();
-    const content = groqData.choices?.[0]?.message?.content;
-    if (content) return content.trim();
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (text) return text.trim();
   } catch (err) {
-    console.warn("120b modelida xatolik, zaxira qwen modeliga o'tilmoqda...");
+    console.error("Gemini API xatosi:", err.message);
   }
-
-  // 2-urinish: qwen/qwen3.8-27b (Zaxira model)
-  try {
-    const qwenRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROQ_KEY.trim()}`
-      },
-      body: JSON.stringify({
-        model: "qwen/qwen3.8-27b",
-        messages: [
-          {
-            role: "system",
-            content: "Siz aqlli va do'stona Telegram AI yordamchisiz. O'zbek tilida ravon javob bering."
-          },
-          { role: "user", content: promptText }
-        ]
-      })
-    });
-    const qwenData = await qwenRes.json();
-    const content = qwenData.choices?.[0]?.message?.content;
-    if (content) return content.trim();
-  } catch (err) {
-    console.error("Zaxira Groq modeli xatosi:", err.message);
-  }
-
-  return "Kechirasiz, savolingizga javob olishda uzilish bo'ldi. Iltimos, qaytadan yozib ko'ring.";
+  return "Kechirasiz, savolingizga javob olishda xatolik yuz berdi. Iltimos, qaytadan yozib ko'ring.";
 }
 
 // Xabarni qabul qilish va javob qaytarish
