@@ -55,6 +55,7 @@ async function sendMessage(chatId, text) {
 // Google Gemini orqali AI javobini olish
 async function askAI(promptText) {
   const models = ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+  let lastError = null;
   for (const model of models) {
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY.trim()}`, {
@@ -73,12 +74,14 @@ async function askAI(promptText) {
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text) return text.trim();
-      console.error(`Gemini API javobi (${model}):`, data.error?.message || data);
+      lastError = data.error?.message || JSON.stringify(data);
+      console.error(`Gemini API javobi (${model}):`, lastError);
     } catch (err) {
+      lastError = err.message;
       console.error(`Gemini API xatosi (${model}):`, err.message);
     }
   }
-  return "Kechirasiz, savolingizga javob olishda xatolik yuz berdi. Iltimos, qaytadan yozib ko'ring.";
+  return `Kechirasiz, savolingizga javob olishda xatolik yuz berdi (${lastError || 'API xatosi'}). Iltimos, qaytadan yozib ko'ring.`;
 }
 
 // Xabarni qabul qilish va javob qaytarish
