@@ -9,7 +9,7 @@ let offset = 0;
 console.log("------------------------------------------");
 console.log("🚀 AI Yordamchi Telegram bot ishga tushdi!");
 console.log("🤖 Bot: @Abdu_yordamchi_bot");
-console.log("⚡ Google Gemini 1.5 Flash AI ulandi!");
+console.log("⚡ Google Gemini AI ulandi!");
 console.log("------------------------------------------");
 
 // Ob-havo ma'lumotlarini olish
@@ -52,27 +52,31 @@ async function sendMessage(chatId, text) {
   }
 }
 
-// Google Gemini orqali AI javobini olish (gemini-1.5-flash)
+// Google Gemini orqali AI javobini olish
 async function askAI(promptText) {
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY.trim()}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: `Siz aqlli, samimiy va do'stona Telegram AI yordamchisiz. O'zbek tilida ravon va aniq javob bering.\n\nSavol: ${promptText}` }
-            ]
-          }
-        ]
-      })
-    });
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (text) return text.trim();
-  } catch (err) {
-    console.error("Gemini API xatosi:", err.message);
+  const models = ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+  for (const model of models) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY.trim()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: `Siz aqlli, samimiy va do'stona Telegram AI yordamchisiz. O'zbek tilida ravon va aniq javob bering.\n\nSavol: ${promptText}` }
+              ]
+            }
+          ]
+        })
+      });
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return text.trim();
+      console.error(`Gemini API javobi (${model}):`, data.error?.message || data);
+    } catch (err) {
+      console.error(`Gemini API xatosi (${model}):`, err.message);
+    }
   }
   return "Kechirasiz, savolingizga javob olishda xatolik yuz berdi. Iltimos, qaytadan yozib ko'ring.";
 }
