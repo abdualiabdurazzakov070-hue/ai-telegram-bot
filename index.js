@@ -103,7 +103,29 @@ async function handleMessage(msg) {
   console.log(`📩 Xabar keldi [${chatId}]: "${text}"`);
 
   if (text === '/start') {
-    const welcome = "Assalomu alaykum! 👋\n\nMen **Abdualining shaxsiy AI assistent botiman** 🤖✨\n\nSizga qanday yordam bera olaman yoki qanday tavsiya kerak? Savollaringiz, takliflaringiz yoki fikrlaringiz bo'lsa, bemalol yozishingiz mumkin!";
+    const welcome = `👋 Assalomu alaykum!
+
+Abduali Assistant botiga xush kelibsiz! 🤖
+
+Men sizning shaxsiy AI yordamchingizman.
+
+✨ Men nimalar qila olaman?
+
+🧠 Savollaringizga javob beraman
+
+💻 Dasturlashda yordam beraman
+
+🌍 Turli mavzularda ma'lumot beraman
+
+✍️ Matn yozish va tarjima qilishda yordam beraman
+
+💡 G‘oyalar va muammolarga yechim topaman
+
+━━━━━━━━━━━━━━━
+
+🚀 Boshlash uchun menga xabar yuboring!
+
+Sizning AI yordamchingiz — Abduali Assistant.`;
     await sendMessage(chatId, welcome);
     return;
   }
